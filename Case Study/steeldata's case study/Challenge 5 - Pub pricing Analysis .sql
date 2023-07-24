@@ -203,16 +203,110 @@ SELECT * FROM ratings
 7. What is the average price per unit for each category of beverages, excluding the category 'Spirit'?
 */
 
+	SELECT
+		b.category,
+		AVG(b.price_per_unit) as Average_Price
+	FROM beverages b JOIN sales2 s
+		ON b.beverage_id = s.beverage_id
+	WHERE b.category != 'Spirit'
+	GROUP BY
+		b.category
+	ORDER BY 
+		Average_Price DESC
+
+
+/*
+8. Which pubs have a rating higher than the average rating of all pubs?
+*/
+
+	SELECT
+		p.pub_name,
+		r.rating
+	FROM pubs p JOIN ratings r
+		ON p.pub_id = r.pub_id
+	WHERE r.rating > (SELECT AVG(rating) FROM ratings )
+	ORDER BY 
+		r.rating DESC
+
+/*
+9. What is the running total of sales amount for each pub, ordered by the transaction date?
+*/
+
+	SELECT
+		p.pub_name,
+		s.transaction_date,
+		SUM(s.quantity*b.price_per_unit) OVER (PARTITION BY p.pub_name ORDER BY s.transaction_date)  Total_Runing_Sales
+	FROM pubs p JOIN sales2 s
+		ON p.pub_id = s.pub_id
+		JOIN beverages b
+		ON s.beverage_id = b.beverage_id
 	
+/*
+10. For each country, what is the average price per unit of beverages in each category, 
+    and what is the overall average price per unit of beverages across all categories?
+*/
+
+	WITH avg_ech_country AS (
+			SELECT
+				p.country,
+				b.category,
+				AVG(b.price_per_unit) as Average_Price
+			FROM pubs p JOIN sales2 s
+				ON p.pub_id = s.pub_id
+				JOIN beverages b
+				ON S.beverage_id=b.beverage_id
+			GROUP BY
+				p.country,b.category),
+
+		ovrl_avg AS (
+			SELECT
+				p.country,
+				AVG(price_per_unit) as Overl_prc
+			FROM pubs p JOIN sales2 s
+				ON p.pub_id = s.pub_id
+				JOIN beverages b
+				ON S.beverage_id=b.beverage_id
+			GROUP BY 
+				p.country)
+	
+		SELECT
+			a.country,
+			a.category,
+			Average_Price AS Average_Price_Each_Category,
+			Overl_prc AS Overall_avg_Price
+		FROM avg_ech_country a JOIN ovrl_avg b ON a.country = b.country
+		ORDER BY a.country
 
 
 
-SELECT * FROM pubs
-SELECT * FROM beverages
-SELECT * FROM sales2
-SELECT * FROM ratings
+/*
+11. For each pub, what is the percentage contribution of each category of beverages to the total sales amount, and what is the pub's overall sales amount?
+*/
+
+
+	WITH perctg_ech_pub as (
+			SELECT
+				p.pub_name,
+				b.category,
+				SUM(s.quantity*b.price_per_unit) as Total_Sales		
+			FROM pubs p JOIN sales2 s 
+				ON p.pub_id = s.pub_id
+				JOIN beverages b
+				ON s.beverage_id = b.beverage_id
+			GROUP BY
+				p.pub_name,b.category),
+
+		ovrl_sales AS (
+			SELECT *, 
+				SUM(Total_Sales) OVER (PARTITION BY pub_name ) AS Overal_Sales
+			FROM perctg_ech_pub)
+
+	   SELECT
+			*,
+			ROUND(((Total_Sales / Overal_Sales)*100),2) AS Percentage_Contribution
+	   FROM ovrl_sales
+	   ORDER BY 
+			pub_name
 
 
 
-
-SELECT * FROM sales2
